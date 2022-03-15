@@ -22,24 +22,23 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-#if 1
-    // TODO: Validation
-    long duration = atoi(argv[1]);
-
     // TODO:
-    // - Allow multiple timers to be set
     // - Allow durations to be set in seconds, minutes or hours
     //   e.g. "10s", "3m", "1h"
-#else
-    for (int i = 1; i < argc; i++) {
 
+    int tcount = argc - 1;
+    mtimer_t timers[tcount];
+
+    for (int i = 0; i < tcount; i++) {
+        // TODO: Validation
+        long duration = atoi(argv[i+1]);
+        timers[i] = new_timer(.display=display_time, .duration=duration,
+                .on_complete=notify, .data="Ding! We're done.");
     }
-#endif
 
-    mtimer_t first_timer = new_timer(.duration=duration, .display=display_time,
-            .on_complete=notify, .data="Ding! We're done.");
-
-    run_timer(first_timer);
+    for (int i = 0; i < tcount; i++) {
+        run_timer(timers[i]);
+    }
 
     return 0;
 }
