@@ -5,18 +5,14 @@
 #include <stdint.h>
 
 /**
- * Facilitate the creation of callback functions
- */
-typedef void (*tmr_cb)(void *);
-
-/**
  * A countdown timer is a duration in seconds, along with an optional
  * callback function and custom data
  */
 typedef struct Timer {
-    uint32_t duration;      // In seconds
-    tmr_cb on_complete;     // Callback
-    void *data;             // Data passed to callback
+    uint32_t duration;              // In seconds
+    void (*display)(long s);        // Display function
+    void (*on_complete)(void *);    // Callback function
+    void *data;                     // Data passed to callback
 } mtimer_t;
 
 /**
@@ -24,9 +20,8 @@ typedef struct Timer {
  */
 #define new_timer(...) (mtimer_t){__VA_ARGS__}
 
-/**
- * Initialise the countdown
- * Once complete, if a callback is present, run it then return
+/*
+ * Each platform will need to provide the following
  */
 void run_timer(mtimer_t t);
 

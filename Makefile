@@ -3,7 +3,10 @@ CFLAGS ?= -Wall -O0 -g
 INC = include/
 
 APP = mtm
-SOURCES = $(wildcard src/*.c)
+
+SRC = src
+INC = include
+SOURCES = $(SRC)/mtm.c $(SRC)/multi_timer.c
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES))
 
 .PHONY: all
