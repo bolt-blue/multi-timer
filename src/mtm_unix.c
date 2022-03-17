@@ -4,8 +4,8 @@
 #include "multi_timer.h"
 
 // Forward declarations
-void display_time(long s);
-void notify(void *);
+void display_time(long seconds);
+void notify(void *message);
 void usage(char *pname);
 
 // The following handle any necessary forward declared definitions
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < tcount; i++) {
         // TODO: Validation
         long duration = atoi(argv[i+1]);
-        timers[i] = new_timer(.display=display_time, .duration=duration,
+        timers[i] = new_timer(.on_display=display_time, .duration=duration,
                 .on_complete=notify, .data="Ding! We're done.");
     }
 

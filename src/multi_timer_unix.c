@@ -12,13 +12,12 @@
 void run_timer(mtimer_t t)
 {
     // TODO:
-    // - Separate out display functions (e.g. `display_time`)
-    //   - These should be handled by CLI/GUI layer, per platform
     // - Fork this process?
     //   Do we care if this blocks the application?
+    //   Don't think we care about running parallel timers for now
 
     // TODO: Generate error, or set default
-    if (!t.display) return;
+    if (!t.on_display) return;
 
     struct timespec wait = (struct timespec){.tv_nsec=ONE_TENTH_SEC};
     struct timespec begin;
@@ -29,7 +28,7 @@ void run_timer(mtimer_t t)
     time_t delta, counter = 0;
     time_t remaining = t.duration;
 
-    t.display(remaining);
+    t.on_display(remaining);
     while (remaining) {
         nanosleep(&wait, NULL);
         clock_gettime(CLOCK_MONOTONIC, &now);
@@ -38,7 +37,7 @@ void run_timer(mtimer_t t)
         if (delta > counter && now.tv_nsec >= begin.tv_nsec) {
             counter++;
             remaining--;
-            t.display(remaining);
+            t.on_display(remaining);
         }
     }
 

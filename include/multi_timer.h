@@ -10,7 +10,7 @@
  */
 typedef struct Timer {
     uint32_t duration;              // In seconds
-    void (*display)(long s);        // Display function
+    void (*on_display)(long);       // Display function
     void (*on_complete)(void *);    // Callback function
     void *data;                     // Data passed to callback
 } mtimer_t;
