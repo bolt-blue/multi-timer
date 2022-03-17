@@ -8,12 +8,13 @@ SRC = src
 INC = include
 SOURCES = $(SRC)/mtm.c $(SRC)/multi_timer.c
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES))
+LINKS = -lncurses
 
 .PHONY: all
 all: $(APP) compdb
 
 $(APP): $(OBJECTS)
-	$(CC) $(CFLAGS) -I$(INC) $(OBJECTS) -o $@
+	$(CC) $(CFLAGS) -I$(INC) $(OBJECTS) -o $@ $(LINKS)
 
 DEPS := $(OBJECTS:.o=.d)
 -include $(DEPS)
