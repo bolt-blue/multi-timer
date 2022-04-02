@@ -10,7 +10,7 @@
  */
 typedef struct Timer {
     uint32_t duration;              // In seconds
-    char *title;                    // Timer title/description (max len 31)
+    char *title;                    // Timer title/description
     void (*on_display)(long);       // Display function
     void (*on_complete)(void *);    // Callback function
     void *data;                     // Data passed to callback
@@ -21,9 +21,14 @@ typedef struct Timer {
  */
 #define new_timer(...) (mtimer_t){__VA_ARGS__}
 
-/*
- * Each platform will need to provide the following
- */
+// Timer memory is handled internally - platform independent
+int add_timer(mtimer_t timer);
+void free_timers(void);
+int num_timers(void);
+mtimer_t get_timer(int index);
+
+// Each platform will need to provide the following
+// See: 'multi_timer_<platform>.c'
 void run_timer(mtimer_t t);
 
 #endif /* MULTI_TIMER_H */

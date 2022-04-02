@@ -6,10 +6,14 @@
 
 #include "mtm.h"
 
+#define MAX_STR 64
+
 // Forward declarations - internal
-static mtimer_t *create_timers(int *count);
+static int create_timers(void);
 static void print_title(char *title);
-static int cleanup(const int timer_count, mtimer_t *timers);
+static int cleanup(void);
+
+static WINDOW *win, *boxwin;
 
 /* ========================================================================== */
 /* The following functions are required by all implementations                */
@@ -25,6 +29,17 @@ int init_ui(void)
     //noecho();
     //keypad(stdscr, TRUE);
 
+    int w, h;
+    getmaxyx(stdscr, h, w);
+
+    int boxw = 44, boxh = 12;
+    boxwin = newwin(boxh, boxw, h/2 - boxh/2, w/2 - boxw/2);
+    win = derwin(boxwin, boxh-2, boxw-4, 1, 2);
+    refresh();
+
+    box(boxwin, 0, 0);
+    wrefresh(boxwin);
+
     // TODO: Return any error code as necessary
     return 0;
 }
@@ -34,6 +49,7 @@ int init_ui(void)
  */
 void teardown_ui(void)
 {
+    delwin(win);
     endwin();
 }
 
@@ -44,17 +60,25 @@ void teardown_ui(void)
  */
 int run(void)
 {
-    int tcount = 0;
-    mtimer_t *timers = create_timers(&tcount);
+    // TODO: Error handling
+    create_timers();
+    int tcount = num_timers();
 
     for (int i = 0; i < tcount; i++) {
-        clear();
-        if (timers[i].title)
-            print_title(timers[i].title);
-        run_timer(timers[i]);
+        wclear(win);
+        mtimer_t timer = get_timer(i);
+        if (timer.title)
+            print_title(timer.title);
+        // Allow timer to be killed by user
+        // TODO: Catch Ctl-C instead so we don't kill the whole program if
+        // there are multiple timers
+        cbreak();
+        run_timer(timer);
+        nocbreak();
     }
 
-    cleanup(tcount, timers);
+    cleanup();
+    free_timers();
 
     return 0;
 }
@@ -67,8 +91,8 @@ void display_time(long seconds)
     int32_t h = seconds / 60 / 60;
     int32_t m = (seconds - h * 60 * 60) / 60;
     int32_t s = seconds - h * 60 * 60 - m * 60;
-    printw("\r%02d:%02d:%02d", h, m, s);
-    refresh();
+    wprintw(win, "\r%02d:%02d:%02d", h, m, s);
+    wrefresh(win);
 }
 
 /**
@@ -80,11 +104,11 @@ void notify(void *message)
     if (!message) return;
 
     char *msg = (char *)message;
-    printw("\n%s", msg);
+    mvwprintw(win, 3, 0, "%s", msg);
+    mvwprintw(win, 4, 0, "Press any key to continue...");
 
-    printw("\nPress any key to continue...");
-    getch();
-    clear();
+    wgetch(win);
+    wclear(win);
 }
 
 /* ========================================================================== */
@@ -94,36 +118,34 @@ void notify(void *message)
 /**
  * Create timers from user input
  */
-mtimer_t *create_timers(int *tcount)
+int create_timers(void)
 {
-    mtimer_t *timers = NULL;
-
     // TODO: Loop to build timer list
     while (1) {
-        clear();
+        wclear(win);
 
         char new = 0;
-        printw("Create new timer (y/N)? ");
-        scanw("%c", &new);
+        wprintw(win, "Create new timer (y/N)? ");
+        wscanw(win, "%c", &new);
         if (new != 'Y' && new != 'y')
             break;
 
         long duration = 0;
-        char title_input[64] = {};
-        char msg_input[64] = {};
+        char title_input[MAX_STR] = {};
+        char msg_input[MAX_STR] = {};
 
         // TODO:
         // - Allow durations to be set in seconds, minutes or hours
         //   e.g. "10s", "3m", "1h"
         do {
-            printw("Duration: ");
-            scanw("%lu", &duration);
+            mvwprintw(win, 1, 0, "Duration: ");
+            wscanw(win, "%lu", &duration);
         } while (!duration);
 
-        printw("Title: ");
-        getstr(title_input);
-        printw("Message: ");
-        getstr(msg_input);
+        mvwprintw(win, 2, 0, "Title: ");
+        wgetnstr(win, title_input, MAX_STR);
+        mvwprintw(win, 3, 0,  "Message: ");
+        wgetnstr(win, msg_input, MAX_STR);
 
         char *title = NULL, *msg = NULL;
 
@@ -138,12 +160,12 @@ mtimer_t *create_timers(int *tcount)
             strncpy(msg, msg_input, len);
         }
 
-        timers = realloc(timers, ++*tcount * sizeof(mtimer_t));
-        timers[*tcount-1] = new_timer(.title=title, .duration=duration,
-                .on_display=display_time, .on_complete=notify, .data=msg);
+        add_timer(new_timer(.title=title, .duration=duration,
+                    .on_display=display_time, .on_complete=notify, .data=msg));
     }
 
-    return timers;
+    // TODO: Error handling
+    return 0;
 }
 
 /**
@@ -152,14 +174,21 @@ mtimer_t *create_timers(int *tcount)
  */
 void print_title(char *title)
 {
-    printw("%s\n", title);
+    wprintw(win, "%s\n", title);
 }
 
 /**
  * Cleanup
  */
-int cleanup(const int tcount, mtimer_t *timers)
+int cleanup(void)
 {
-    // TODO: Clean up malloc'd strings
+    // NOTE: In the current use-case, timer .data is a malloc'd message string.
+    // See create_timers()
+    int tcount = num_timers();
+    for (int i = 0; i < tcount; i++) {
+        mtimer_t t = get_timer(i);
+        free(t.title);
+        free(t.data);
+    }
     return 0;
 }
