@@ -26,6 +26,7 @@ int add_timer(mtimer_t timer);
 void free_timers(void);
 int num_timers(void);
 mtimer_t get_timer(int index);
+int parse_duration(char *duration);
 
 // Each platform will need to provide the following
 // See: 'multi_timer_<platform>.c'

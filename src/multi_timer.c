@@ -1,5 +1,6 @@
 #include "multi_timer.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 
 /*
@@ -42,4 +43,42 @@ int num_timers(void)
 mtimer_t get_timer(int i)
 {
     return timers_g[i];
+}
+
+/**
+ * Convert duration string into integer seconds
+ * Duration d is presumed to be nul-terminated
+ * Duration d is presumed to have only plain digits, or digits followed by one
+ * of the suffixes 's', 'm' or 'h'
+ * Return duration in seconds
+ */
+int parse_duration(char *dstr)
+{
+    int s = 0;
+
+    int tmp_sum = 0;
+    char *cur = dstr;
+    while (1) {
+        if (!isdigit(*cur)) {
+            char type = *cur;
+
+            *cur = '\0';
+            tmp_sum += atoi(dstr);
+
+            if (type == 'm')
+                tmp_sum *= 60;
+            else if (type == 'h')
+                tmp_sum *= 60 * 60;
+
+            s += tmp_sum;
+
+            if (type == '\0')
+                break;
+            dstr = cur + 1;
+            tmp_sum = 0;
+        }
+        cur++;
+    }
+
+    return s;
 }

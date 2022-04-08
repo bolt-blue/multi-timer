@@ -233,7 +233,7 @@ int create_timers(void)
         // clearing the screen and clobbering any other form data
         // TODO: Parse duration string properly
         // - Allow use of 's', 'm' and  'h'
-        int duration = atoi(duration_input);
+        int duration = parse_duration(duration_input);
         if (!duration) continue;
 
         if (title_input) {
