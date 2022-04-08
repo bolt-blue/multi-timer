@@ -9,8 +9,13 @@ User input is then awaited in order to start the next timer.
 
 ## TODO
 
-- [ ] Finish testing a single timer
-- [ ] Implement basic command line interface
-- [ ] Implement multiple timers
-- [ ] Add GUI notification
+- [x] Finish testing a single timer
+- [x] Implement basic command line interface
+- [x] Implement multiple timers
+- [x] Add CLI/GUI notification
 - [ ] Add audio notification
+- [ ] Fix CLI bugs
+- [ ] Improve CLI
+- [ ] Implement save/load
+- [ ] Implement re-arrangement of timer list
+- [ ] Implement deletion of timer(s) from list
