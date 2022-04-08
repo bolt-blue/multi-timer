@@ -136,7 +136,7 @@ int create_timers(void)
     // Field options
     set_field_back(field[0], A_UNDERLINE);
     field_opts_off(field[0], O_AUTOSKIP);
-    set_field_type(field[0], TYPE_REGEXP, "^([1-9][0-9]*[hms][\t ]*)+$");
+    set_field_type(field[0], TYPE_REGEXP, "^([1-9][0-9]*[hms]?[\t ]*)+$");
 
     set_field_back(field[1], A_UNDERLINE);
     field_opts_off(field[1], O_AUTOSKIP | O_STATIC);
@@ -181,7 +181,7 @@ int create_timers(void)
         mvwprintw(win, 4, 0, "Message:");
         wrefresh(win);
 
-        print_status("Press Enter to add");
+        print_status("Duration in s/m/h (default: s), e.g. '1m30s'. Press Enter to submit");
 
         form_driver(form, REQ_FIRST_FIELD);
 
