@@ -8,7 +8,7 @@ SRC = src
 INC = include
 SOURCES = $(SRC)/mtm.c $(SRC)/multi_timer.c
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES))
-LINKS = -lncurses
+LINKS = -lform -lncurses
 
 .PHONY: all
 all: $(APP) compdb

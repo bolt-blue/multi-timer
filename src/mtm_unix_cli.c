@@ -1,3 +1,4 @@
+#include <form.h>
 #include <ncurses.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,10 +9,22 @@
 
 #define MAX_STR 64
 
+// Helper functions
+// TODO: Separate out
+char *strtriml(char *s);
+char *strtrimr(char *s);
+char *strtrim(char *s);
+
 // Forward declarations - internal
 static int create_timers(void);
+static void wprint_window_title(WINDOW *win, char *title);
 static void print_title(char *title);
+static void wprint_status(WINDOW *win, char*status);
+static void wclear_status(WINDOW *win);
 static int cleanup(void);
+
+#define print_status(...) wprint_status(stdscr, __VA_ARGS__)
+#define clear_status() wclear_status(stdscr)
 
 static WINDOW *win, *boxwin;
 
@@ -25,20 +38,9 @@ static WINDOW *win, *boxwin;
 int init_ui(void)
 {
     initscr();
-    raw();
-    //noecho();
-    //keypad(stdscr, TRUE);
-
-    int w, h;
-    getmaxyx(stdscr, h, w);
-
-    int boxw = 44, boxh = 12;
-    boxwin = newwin(boxh, boxw, h/2 - boxh/2, w/2 - boxw/2);
-    win = derwin(boxwin, boxh-2, boxw-4, 1, 2);
-    refresh();
-
-    box(boxwin, 0, 0);
-    wrefresh(boxwin);
+    noecho();
+    cbreak(); /* allow C-c to behave normally */
+    keypad(stdscr, TRUE);
 
     // TODO: Return any error code as necessary
     return 0;
@@ -104,15 +106,18 @@ void notify(void *message)
     if (!message) return;
 
     char *msg = (char *)message;
-    mvwprintw(win, 3, 0, "%s", msg);
-    mvwprintw(win, 4, 0, "Press any key to continue...");
+    mvwprintw(win, 2, 0, "%s", msg);
 
+    flash();
+
+    print_status("Press any key to continue");
     wgetch(win);
     wclear(win);
+    clear_status();
 }
 
 /* ========================================================================== */
-/* The following functions are specific to this implementation                */
+/* The following functions are specific to this implementation (unix)         */
 /* ========================================================================== */
 
 /**
@@ -120,41 +125,123 @@ void notify(void *message)
  */
 int create_timers(void)
 {
-    // TODO: Loop to build timer list
+    FIELD *field[4];
+    FORM *form;
+
+    field[0] = new_field(1, 30, 0, 10, 0, 0);
+    field[1] = new_field(1, 30, 2, 10, 0, 0);
+    field[2] = new_field(1, 30, 4, 10, 0, 0);
+    field[3] = NULL;
+
+    // Field options
+    set_field_back(field[0], A_UNDERLINE);
+    field_opts_off(field[0], O_AUTOSKIP);
+    set_field_type(field[0], TYPE_REGEXP, "^([1-9][0-9]*[hms][\t ]*)+$");
+
+    set_field_back(field[1], A_UNDERLINE);
+    field_opts_off(field[1], O_AUTOSKIP | O_STATIC);
+    set_max_field(field[1], 63);
+
+    set_field_back(field[2], A_UNDERLINE);
+    field_opts_off(field[2], O_AUTOSKIP | O_STATIC);
+    set_max_field(field[2], 63);
+
+    // Create form and post
+    form = new_form(field);
+
+    int h, w;
+    getmaxyx(stdscr, h, w);
+
+    int rows, cols;
+    scale_form(form, &rows, &cols);
+
+    boxwin = newwin(rows + 4, cols + 4, h/2 - rows/2, w/2 - cols/2);
+    keypad(boxwin, TRUE);
+
+    win = derwin(boxwin, rows, cols, 2, 2);
+
+    set_form_win(form, boxwin);
+    set_form_sub(form, win);
+
+    box(boxwin, 0, 0);
+    refresh();
+
+    wprint_window_title(boxwin, "New Timer");
+
+    // TODO:
+    // - Determine why subsequent runs through the loop do not show the form
+    //   attributes as expected (currently specifically underlined fields)
+    // - Fix
     while (1) {
-        wclear(win);
+        post_form(form);
+        wrefresh(boxwin);
 
-        char new = 0;
-        wprintw(win, "Create new timer (y/N)? ");
-        wscanw(win, "%c", &new);
-        if (new != 'Y' && new != 'y')
-            break;
+        mvwprintw(win, 0, 0, "Duration:");
+        mvwprintw(win, 2, 0, "Title:");
+        mvwprintw(win, 4, 0, "Message:");
+        wrefresh(win);
 
-        long duration = 0;
-        char title_input[MAX_STR] = {};
-        char msg_input[MAX_STR] = {};
+        print_status("Press Enter to add");
 
-        // TODO:
-        // - Allow durations to be set in seconds, minutes or hours
-        //   e.g. "10s", "3m", "1h"
-        do {
-            mvwprintw(win, 1, 0, "Duration: ");
-            wscanw(win, "%lu", &duration);
-        } while (!duration);
+        form_driver(form, REQ_FIRST_FIELD);
 
-        mvwprintw(win, 2, 0, "Title: ");
-        wgetnstr(win, title_input, MAX_STR);
-        mvwprintw(win, 3, 0,  "Message: ");
-        wgetnstr(win, msg_input, MAX_STR);
+        int ch;
+        while((ch = wgetch(boxwin)) != '\n' || ch == KEY_ENTER) {
+            switch(ch) {
+                case KEY_DOWN:
+                case '\t': {
+                    form_driver(form, REQ_NEXT_FIELD);
+                    // Go to the end of the existing buffer
+                    form_driver(form, REQ_END_LINE);
+                } break;
 
+                case KEY_UP:
+                case KEY_BTAB: {
+                    form_driver(form, REQ_PREV_FIELD);
+                    form_driver(form, REQ_END_LINE);
+                } break;
+
+                case KEY_LEFT: {
+                    form_driver(form, REQ_LEFT_CHAR);
+                } break;
+
+                case KEY_RIGHT: {
+                    form_driver(form, REQ_RIGHT_CHAR);
+                } break;
+
+                case KEY_BACKSPACE:
+                case 127: {
+                    form_driver(form, REQ_LEFT_CHAR);
+                    form_driver(form, REQ_DEL_CHAR);
+                    wrefresh(win);
+                } break;
+
+                default: {
+                    // Print normal characters
+                    form_driver(form, ch);
+                } break;
+            }
+        }
+
+        form_driver(form, REQ_VALIDATION);
+        char *title_input = strtrim(field_buffer(field[1], 0));
+        char *msg_input = strtrim(field_buffer(field[2], 0));
+        char *duration_input = strtrim(field_buffer(field[0], 0));
         char *title = NULL, *msg = NULL;
 
-        if (title_input[0] != '\0') {
+        // If no duration has been provided we quietly try again, avoiding
+        // clearing the screen and clobbering any other form data
+        // TODO: Parse duration string properly
+        // - Allow use of 's', 'm' and  'h'
+        int duration = atoi(duration_input);
+        if (!duration) continue;
+
+        if (title_input) {
             int len = strlen(title_input) + 1;
             title = malloc(len);
             strncpy(title, title_input, len);
         }
-        if (msg_input[0] != '\0') {
+        if (msg_input) {
             int len = strlen(msg_input) + 1;
             msg = malloc(len);
             strncpy(msg, msg_input, len);
@@ -162,19 +249,79 @@ int create_timers(void)
 
         add_timer(new_timer(.title=title, .duration=duration,
                     .on_display=display_time, .on_complete=notify, .data=msg));
+
+        clear_status();
+
+        set_field_buffer(field[0], 0, "\0");
+        set_field_buffer(field[1], 0, "\0");
+        set_field_buffer(field[2], 0, "\0");
+
+        wclear(win);
+        mvwprintw(win, 0, 0, "Create another timer (y/N)? ");
+        wrefresh(win);
+        char new = wgetch(win);
+        if (new != 'Y' && new != 'y') {
+            break;
+        }
+        wclear(win);
+        wrefresh(win);
     }
+
+    // Clean up after form
+    unpost_form(form);
+    free_form(form);
+    free_field(field[0]);
+    free_field(field[1]);
+    free_field(field[2]);
+
+    wclear(boxwin);
+    // Remove the window title
+    // TODO: Likely move to own function
+    box(boxwin, 0, 0);
+    wrefresh(boxwin);
 
     // TODO: Error handling
     return 0;
 }
 
-/**
- * Display timer title text
- * Expects title to be null-terminated
- */
 void print_title(char *title)
 {
-    wprintw(win, "%s\n", title);
+    box(boxwin, 0, 0);
+    wprint_window_title(boxwin, title);
+}
+
+/**
+ * Display window title text
+ * Expects title to be null-terminated
+ */
+void wprint_window_title(WINDOW *w, char *t)
+{
+    if (!*t) return;
+    mvwprintw(w, 0, 1, " %s ", t);
+    wrefresh(w);
+    refresh();
+}
+
+void wprint_status(WINDOW *w, char *s)
+{
+    int y, x;
+    getyx(w, y, x);
+    int status_y = getmaxy(w);
+    mvwprintw(w, status_y - 2, 1, "%s", s);
+    clrtoeol();
+    wmove(w, y, x);
+    wrefresh(w);
+}
+
+void wclear_status(WINDOW *w)
+{
+    int y, x;
+    getyx(w, y, x);
+    int status_y = getmaxy(w);
+    wmove(w, status_y - 2, 0);
+    clrtoeol();
+    wmove(w, y, x);
+    wrefresh(w);
 }
 
 /**
@@ -187,8 +334,49 @@ int cleanup(void)
     int tcount = num_timers();
     for (int i = 0; i < tcount; i++) {
         mtimer_t t = get_timer(i);
-        free(t.title);
-        free(t.data);
+        if(t.title) free(t.title);
+        if(t.data)  free(t.data);
     }
     return 0;
+}
+
+
+/* ========================================================================== */
+/* Helper Functions - should likely be separated out into their own file      */
+/* ========================================================================== */
+
+/**
+ * Left trim string
+ * We do not alter the provided string, or allocate any new memory
+ * We simply return the a pointer to the first non-whitespace char
+ */
+char *strtriml(char *s)
+{
+    while (*s == ' ' || *s == '\t' || *s == '\n')
+        s++;
+    return s;
+}
+
+/**
+ * Right trim string
+ * We /do/ potentially alter the provided string by adding a nul
+ */
+char *strtrimr(char *s)
+{
+    int len = strlen(s);
+    if (!len) return s;
+    char *e = s + len - 1;
+    while (*e == ' ' || *e == '\t' || *e == '\n')
+        e--;
+    *(e + 1) = '\0';
+    return s;
+}
+
+/**
+ * String trim
+ * Trim both left and right trailing whitespace
+ */
+char *strtrim(char *s)
+{
+    return strtrimr(strtriml(s));
 }
