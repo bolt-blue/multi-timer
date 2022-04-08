@@ -64,6 +64,11 @@ int run(void)
 {
     // TODO: Error handling
     create_timers();
+
+    print_status("Press any key to start your timer(s)");
+    wgetch(win);
+    clear_status();
+
     int tcount = num_timers();
 
     for (int i = 0; i < tcount; i++) {
