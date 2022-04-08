@@ -146,7 +146,6 @@ int create_timers(void)
     field_opts_off(field[2], O_AUTOSKIP | O_STATIC);
     set_max_field(field[2], 63);
 
-    // Create form and post
     form = new_form(field);
 
     int h, w;
@@ -155,7 +154,7 @@ int create_timers(void)
     int rows, cols;
     scale_form(form, &rows, &cols);
 
-    boxwin = newwin(rows + 4, cols + 4, h/2 - rows/2, w/2 - cols/2);
+    boxwin = newwin(rows + 4, cols + 4, h/2 - rows/2 - 2, w/2 - cols/2 - 2);
     keypad(boxwin, TRUE);
 
     win = derwin(boxwin, rows, cols, 2, 2);
@@ -163,17 +162,19 @@ int create_timers(void)
     set_form_win(form, boxwin);
     set_form_sub(form, win);
 
-    box(boxwin, 0, 0);
-    refresh();
-
-    wprint_window_title(boxwin, "New Timer");
+    WINDOW *popup = newwin(6, cols + 8, h/2 - 2, w/2 - cols/2 - 4);
+    WINDOW *popup_content = derwin(popup, 3, cols + 4, 2, 2);
 
     // TODO:
     // - Determine why subsequent runs through the loop do not show the form
     //   attributes as expected (currently specifically underlined fields)
     // - Fix
     while (1) {
+        box(boxwin, 0, 0);
+        refresh();
+
         post_form(form);
+        wprint_window_title(boxwin, "New Timer");
         wrefresh(boxwin);
 
         mvwprintw(win, 0, 0, "Duration:");
@@ -256,15 +257,17 @@ int create_timers(void)
         set_field_buffer(field[1], 0, "\0");
         set_field_buffer(field[2], 0, "\0");
 
-        wclear(win);
-        mvwprintw(win, 0, 0, "Create another timer (y/N)? ");
-        wrefresh(win);
-        char new = wgetch(win);
+        box(popup, 0, 0);
+        mvwprintw(popup_content, 0, 0, "Create another timer (y/N)? ");
+        wrefresh(popup);
+        char new = wgetch(popup_content);
         if (new != 'Y' && new != 'y') {
+            wclear(popup);
+            wrefresh(popup);
             break;
         }
-        wclear(win);
-        wrefresh(win);
+        wclear(popup);
+        wrefresh(popup);
     }
 
     // Clean up after form
