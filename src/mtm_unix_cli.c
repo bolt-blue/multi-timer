@@ -106,12 +106,13 @@ void display_time(long seconds)
  * Take a message string and print to stdout
  * Has to accept void * in order to be compatible with multi timer callback
  */
-void notify(void *message)
+void notify(void *data)
 {
-    if (!message) return;
+    if (!data) return;
+    Notification n = *(Notification *)data;
 
-    char *msg = (char *)message;
-    mvwprintw(win, 2, 0, "%s", msg);
+    mvwprintw(win, 2, 0, "%s", n.msg);
+    mvwprintw(win, 4, 0, "TODO: Play '%s'", n.aud);
 
     flash();
 
@@ -130,18 +131,20 @@ void notify(void *message)
  */
 int create_timers(void)
 {
-    FIELD *field[4];
+    FIELD *field[5];
     FORM *form;
 
-    field[0] = new_field(1, 30, 0, 10, 0, 0);
-    field[1] = new_field(1, 30, 2, 10, 0, 0);
-    field[2] = new_field(1, 30, 4, 10, 0, 0);
-    field[3] = NULL;
+    field[0] = new_field(1, 30, 0, 13, 0, 0);
+    field[1] = new_field(1, 30, 2, 13, 0, 0);
+    field[2] = new_field(1, 30, 4, 13, 0, 0);
+    field[3] = new_field(1, 30, 6, 13, 0, 0);
+    field[4] = NULL;
 
     // Field options
     set_field_back(field[0], A_UNDERLINE);
     field_opts_off(field[0], O_AUTOSKIP);
     set_field_type(field[0], TYPE_REGEXP, "^([1-9][0-9]*[hms]?[\t ]*)+$");
+    set_max_field(field[0], 31);
 
     set_field_back(field[1], A_UNDERLINE);
     field_opts_off(field[1], O_AUTOSKIP | O_STATIC);
@@ -150,6 +153,12 @@ int create_timers(void)
     set_field_back(field[2], A_UNDERLINE);
     field_opts_off(field[2], O_AUTOSKIP | O_STATIC);
     set_max_field(field[2], 63);
+
+    set_field_back(field[3], A_UNDERLINE);
+    field_opts_off(field[3], O_AUTOSKIP | O_STATIC);
+    // Filename must have no spaces, unless enclosed within ""
+    set_field_type(field[3], TYPE_REGEXP, "^(([^[:space:]]*)|(\".*\")) *$");
+    set_max_field(field[3], 63);
 
     form = new_form(field);
 
@@ -185,6 +194,7 @@ int create_timers(void)
         mvwprintw(win, 0, 0, "Duration:");
         mvwprintw(win, 2, 0, "Title:");
         mvwprintw(win, 4, 0, "Message:");
+        mvwprintw(win, 6, 0, "Sound file:");
         wrefresh(win);
 
         print_status("Duration in s/m/h (default: s), e.g. '1m30s'. Press Enter to submit");
@@ -230,18 +240,20 @@ int create_timers(void)
         }
 
         form_driver(form, REQ_VALIDATION);
-        char *title_input = strtrim(field_buffer(field[1], 0));
-        char *msg_input = strtrim(field_buffer(field[2], 0));
+
         char *duration_input = strtrim(field_buffer(field[0], 0));
-        char *title = NULL, *msg = NULL;
 
         // If no duration has been provided we quietly try again, avoiding
         // clearing the screen and clobbering any other form data
-        // TODO: Parse duration string properly
-        // - Allow use of 's', 'm' and  'h'
         int duration = parse_duration(duration_input);
         if (!duration) continue;
 
+        char *title_input = strtrim(field_buffer(field[1], 0));
+        char *msg_input = strtrim(field_buffer(field[2], 0));
+        char *audio_input = strtrim(field_buffer(field[3], 0));
+        char *title = NULL, *msg = NULL, *audio = NULL;
+
+        // TODO: Separate into helper function
         if (title_input) {
             int len = strlen(title_input) + 1;
             title = malloc(len);
@@ -252,12 +264,24 @@ int create_timers(void)
             msg = malloc(len);
             strncpy(msg, msg_input, len);
         }
+        if (audio_input) {
+            int len = strlen(audio_input) + 1;
+            audio = malloc(len);
+            strncpy(audio, audio_input, len);
+        }
+
+        Notification *notification = malloc(sizeof(Notification));
+        *notification = (Notification) {.msg=msg, .aud=audio};
 
         add_timer(new_timer(.title=title, .duration=duration,
-                    .on_display=display_time, .on_complete=notify, .data=msg));
+                    .on_display=display_time, .on_complete=notify, .data=notification));
 
         clear_status();
 
+        // Clear form fields, except sound file
+        // It is presumed that a user will generally want the same sound,
+        // or might at least have sounds in the same directory and thus prefer
+        // not to have to repeatedly type the whole path
         set_field_buffer(field[0], 0, "\0");
         set_field_buffer(field[1], 0, "\0");
         set_field_buffer(field[2], 0, "\0");
@@ -281,6 +305,7 @@ int create_timers(void)
     free_field(field[0]);
     free_field(field[1]);
     free_field(field[2]);
+    free_field(field[3]);
 
     wclear(boxwin);
     // Remove the window title
@@ -343,7 +368,12 @@ int cleanup(void)
     for (int i = 0; i < tcount; i++) {
         mtimer_t t = get_timer(i);
         if(t.title) free(t.title);
-        if(t.data)  free(t.data);
+        if(t.data) {
+            Notification *n = t.data;
+            free(n->msg);
+            free(n->aud);
+            free(t.data);
+        }
     }
     return 0;
 }
