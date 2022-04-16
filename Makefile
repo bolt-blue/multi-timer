@@ -6,9 +6,9 @@ APP = mtm
 
 SRC = src
 INC = include
-SOURCES = $(SRC)/mtm.c $(SRC)/multi_timer.c
+SOURCES = $(SRC)/mtm.c $(SRC)/multi_timer.c $(SRC)/mtm_audio.c
 OBJECTS = $(patsubst %.c, %.o, $(SOURCES))
-LINKS = -lform -lncurses
+LINKS = -lform -lncurses -lsndfile -lportaudio
 
 .PHONY: all
 all: $(APP) compdb

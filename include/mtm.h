@@ -3,6 +3,7 @@
 #define MTM_H
 
 #include "multi_timer.h"
+#include "mtm_audio.h"
 
 typedef struct {
     char *msg;  /* Message string */

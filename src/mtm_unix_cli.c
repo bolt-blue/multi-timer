@@ -7,6 +7,12 @@
 
 #include "mtm.h"
 
+#ifndef NDEBUG
+#define MTM_ERRLOG "mtm_debug.log"
+#else
+#define MTM_ERRLOG "/dev/null"
+#endif
+
 #define MAX_STR 64
 
 // Helper functions
@@ -41,6 +47,14 @@ int init_ui(void)
     noecho();
     cbreak(); /* allow C-c to behave normally */
     keypad(stdscr, TRUE);
+
+    // NOTE: Some warnings/output from PortAudio get dumped to stderr, which is
+    // less than ideal with a curses application.
+    // For now, it seems we only have workarounds. We will redirect stderr to a
+    // log file for DEBUG and /dev/null for RELEASE.
+    // This should cover us for PortAudio and any other code that happens to
+    // print to stderr.
+    freopen(MTM_ERRLOG, "a", stderr);
 
     // TODO: Return any error code as necessary
     return 0;
@@ -109,15 +123,23 @@ void display_time(long seconds)
 void notify(void *data)
 {
     if (!data) return;
-    Notification n = *(Notification *)data;
+    Notification noti_data = *(Notification *)data;
 
-    mvwprintw(win, 2, 0, "%s", n.msg);
-    mvwprintw(win, 4, 0, "TODO: Play '%s'", n.aud);
+    mvwprintw(win, 2, 0, "%s", noti_data.msg);
 
     flash();
 
+    // TODO: Better error handling
+    // - Need a means to get meaningful text
+    if (mtm_play_audio(noti_data.aud) != 0) {
+        mvwprintw(win, 6, 0, "Failed to open audio file.");
+    }
+
     print_status("Press any key to continue");
     wgetch(win);
+
+    mtm_stop_audio();
+
     wclear(win);
     clear_status();
 }
@@ -158,7 +180,7 @@ int create_timers(void)
     field_opts_off(field[3], O_AUTOSKIP | O_STATIC);
     // Filename must have no spaces, unless enclosed within ""
     set_field_type(field[3], TYPE_REGEXP, "^(([^[:space:]]*)|(\".*\")) *$");
-    set_max_field(field[3], 63);
+    set_max_field(field[3], 512);
 
     form = new_form(field);
 
