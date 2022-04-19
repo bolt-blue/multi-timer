@@ -32,6 +32,8 @@ static int cleanup(void);
 #define print_status(...) wprint_status(stdscr, __VA_ARGS__)
 #define clear_status() wclear_status(stdscr)
 
+static bool validate_audio_path(FIELD *field, const void *data);
+
 static WINDOW *win, *boxwin;
 
 /* ========================================================================== */
@@ -162,9 +164,13 @@ int create_timers(void)
     field[3] = new_field(1, 30, 6, 13, 0, 0);
     field[4] = NULL;
 
+    // New field type(s)
+    // audio file path
+    FIELDTYPE *TYPE_AUDIOFILE = new_fieldtype(validate_audio_path, NULL);
+
     // Field options
     set_field_back(field[0], A_UNDERLINE);
-    field_opts_off(field[0], O_AUTOSKIP);
+    field_opts_off(field[0], O_AUTOSKIP | O_NULLOK | O_PASSOK);
     set_field_type(field[0], TYPE_REGEXP, "^([1-9][0-9]*[hms]?[\t ]*)+$");
     set_max_field(field[0], 31);
 
@@ -179,7 +185,7 @@ int create_timers(void)
     set_field_back(field[3], A_UNDERLINE);
     field_opts_off(field[3], O_AUTOSKIP | O_STATIC);
     // Filename must have no spaces, unless enclosed within ""
-    set_field_type(field[3], TYPE_REGEXP, "^(([^[:space:]]*)|(\".*\")) *$");
+    set_field_type(field[3], TYPE_AUDIOFILE);
     set_max_field(field[3], 512);
 
     form = new_form(field);
@@ -213,7 +219,7 @@ int create_timers(void)
         wprint_window_title(boxwin, "New Timer");
         wrefresh(boxwin);
 
-        mvwprintw(win, 0, 0, "Duration:");
+        mvwprintw(win, 0, 0, "Duration:*");
         mvwprintw(win, 2, 0, "Title:");
         mvwprintw(win, 4, 0, "Message:");
         mvwprintw(win, 6, 0, "Sound file:");
@@ -264,15 +270,11 @@ int create_timers(void)
         form_driver(form, REQ_VALIDATION);
 
         char *duration_input = strtrim(field_buffer(field[0], 0));
-
-        // If no duration has been provided we quietly try again, avoiding
-        // clearing the screen and clobbering any other form data
-        int duration = parse_duration(duration_input);
-        if (!duration) continue;
-
         char *title_input = strtrim(field_buffer(field[1], 0));
         char *msg_input = strtrim(field_buffer(field[2], 0));
         char *audio_input = strtrim(field_buffer(field[3], 0));
+
+        int duration = parse_duration(duration_input);
         char *title = NULL, *msg = NULL, *audio = NULL;
 
         // TODO: Separate into helper function
@@ -328,6 +330,7 @@ int create_timers(void)
     free_field(field[1]);
     free_field(field[2]);
     free_field(field[3]);
+    free_fieldtype(TYPE_AUDIOFILE);
 
     wclear(boxwin);
     // Remove the window title
@@ -398,6 +401,22 @@ int cleanup(void)
         }
     }
     return 0;
+}
+
+/**
+ * Custom form validator
+ * Field contents must be a valid path to an audio file recognised by mtm_audio
+ * data is unused but required by curses form
+ */
+bool validate_audio_path(FIELD *field, const void *data)
+{
+    char *filepath = strtrim(field_buffer(field, 0));
+    if (!mtm_is_audio_file(filepath)) {
+        print_status("Invalid audio file. Please try again.");
+        return 0;
+    }
+    print_status("");
+    return 1;
 }
 
 
