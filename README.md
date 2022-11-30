@@ -1,21 +1,11 @@
-# Multi Timer
+# Give Up GitHub
 
-Set several timers at once that will then be run sequentially.
+This project has given up GitHub.  ([See Software Freedom Conservancy's *Give Up  GitHub* site for details](https://GiveUpGitHub.org).)
 
-After each timer completes, the user can be notified via visual or audio output.
+You can now find this project at [Codeberg](https://codeberg.org/bolt/multi-timer) instead.
 
-User input is then awaited in order to start the next timer.
+Any use of this project's code by GitHub Copilot, past or present, is done without our permission.  We do not consent to GitHub's use of this project's code in Copilot.
 
+Join us; you can [give up GitHub](https://GiveUpGitHub.org) too!
 
-## TODO
-
-- [x] Finish testing a single timer
-- [x] Implement basic command line interface
-- [x] Implement multiple timers
-- [x] Add CLI/GUI notification
-- [ ] Add audio notification
-- [ ] Fix CLI bugs
-- [ ] Improve CLI
-- [ ] Implement save/load
-- [ ] Implement re-arrangement of timer list
-- [ ] Implement deletion of timer(s) from list
+![Logo of the GiveUpGitHub campaign](https://sfconservancy.org/img/GiveUpGitHub.png)

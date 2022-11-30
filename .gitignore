@@ -1,7 +1,0 @@
-*.[oad]
-compile_commands.json
-.cache/
-tags
-
-mtm
-mtm*.log
